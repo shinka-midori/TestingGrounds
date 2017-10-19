@@ -106,7 +106,7 @@ void AFirstPersonCharacter::SetupPlayerInputComponent(class UInputComponent* Pla
 		if (GunBlueprint == NULL) { return; }
 		FP_Gun = GetWorld()->SpawnActor<AGun>(GunBlueprint);
 		FP_Gun->AttachToComponent(Mesh1P, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), TEXT("GripPoint"));
-		FP_Gun->AnimInstance = Mesh1P->GetAnimInstance();
+		FP_Gun->FP_AnimInstance = Mesh1P->GetAnimInstance();
 		PlayerInputComponent->BindAction("Fire", IE_Pressed, FP_Gun, &AGun::OnFire);
 	}
 
