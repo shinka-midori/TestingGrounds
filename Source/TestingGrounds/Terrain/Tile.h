@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Tile.generated.h"
 
 UCLASS()
@@ -14,8 +15,18 @@ class TESTINGGROUNDS_API ATile : public AActor
 public:	
 	// Sets default values for this actor's properties
 	ATile();
+
 	UFUNCTION(BlueprintCallable, Category = "Setup")
 	void PlaceActors();
+
+	UFUNCTION(BlueprintCallable, Category = "Setup")
+	void PlaceGrass();
+
+	bool CanSpawnAtLocation(FVector, FRotator);
+
+	FVector GetActorDimensions(AActor*);
+
+	bool GenerateLocationAndRotation(FBox);
 
 protected:
 	// Called when the game starts or when spawned
@@ -25,6 +36,13 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Props")
+	TArray<TSubclassOf<AActor>> Props;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Props")
+	TArray<TSubclassOf<UHierarchicalInstancedStaticMeshComponent>> Grass;
 	
-	
+private:
+	FVector SpawnPoint;
+	FRotator SpawnRotator;
 };
