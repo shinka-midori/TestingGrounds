@@ -2,8 +2,12 @@
 
 #include "Tile.h"
 #include "Engine/World.h"
+#include "AI/Navigation/NavigationSystem.h"
 #include "Public/DrawDebugHelpers.h"
 #include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
+#include "Kismet/GameplayStatics.h"
+#include "ActorPool.h"
 
 
 // Sets default values
@@ -11,21 +15,48 @@ ATile::ATile()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+	MinExtent = FVector(0, -2000, 200);
+	MaxExtent = FVector(4000, 2000, 200);
+	NavigationBoundsOffset = FVector(2000, 0, 0);
+}
 
+void ATile::SetPool(UActorPool* InPool)
+{
+	UE_LOG(LogTemp, Warning, TEXT("[%s]Setting Pool: %s"), *GetName(), *InPool->GetName())
+	Pool = InPool;
+
+	PositionNavMeshBoundsVolume();
+}
+
+void ATile::PositionNavMeshBoundsVolume()
+{
+	NavMeshBoundsVolume = Pool->Checkout();
+	if (NavMeshBoundsVolume == nullptr)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[%s] Not enough actors in pool."), *GetName());
+		return;
+	}
+	NavMeshBoundsVolume->SetActorLocation(GetActorLocation() + NavigationBoundsOffset);
+	GetWorld()->GetNavigationSystem()->Build();
 }
 
 // Called when the game starts or when spawned
 void ATile::BeginPlay()
 {
 	Super::BeginPlay();
+	
 	PlaceActors();
+	PlaceAIActors();
+}
+
+void ATile::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Pool->Return(NavMeshBoundsVolume);
 }
 
 void ATile::PlaceActors()
 {
-	FVector Min(0, -2000, 200);
-	FVector Max(4000, 2000, 200);
-	FBox Bounds(Min, Max);
+	FBox Bounds(MinExtent, MaxExtent);
 	
 	for (int i = 0; i < Props.Num(); i++)
 	{
@@ -36,7 +67,7 @@ void ATile::PlaceActors()
 
 			if (GenerateLocationAndRotation(Bounds))
 			{
-				auto ActorToSpawn = GetWorld()->SpawnActor<AActor>(Props[i], SpawnPoint, SpawnRotator);
+				auto ActorToSpawn = GetWorld()->SpawnActor<AActor>(Props[i], SpawnTransform.Location, SpawnTransform.Rotation);
 				ActorToSpawn->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
 			}			
 						
@@ -44,23 +75,44 @@ void ATile::PlaceActors()
 	}	
 }
 
-void ATile::PlaceGrass()
+void ATile::PlaceAIActors()
 {
-	FVector Min(0, -2000, 200);
-	FVector Max(4000, 2000, 200);
-	FBox Bounds(Min, Max);
-
-	for (int i = 0; i < Grass.Num(); i++)
+	FBox Bounds(MinExtent, MaxExtent);
+	for (int i = 0; i < AIActors.Num(); i++)
 	{
-		int NumberToSpawn = FMath::RandRange(10, 20);
+		int NumberToSpawn = FMath::RandRange(1, 5);
+
 		for (int j = 0; j < NumberToSpawn; j++)
 		{
-			auto SpawnPoint = FMath::RandPointInBox(Bounds);
-			//auto GrassToSpawn = GetWorld()->SpawnActor(UHierarchicalInstancedStaticMeshComponent, SpawnPoint);
-			//GrassToSpawn->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+
+			if (GenerateLocationAndRotation(Bounds))
+			{
+				auto ActorToSpawn = GetWorld()->SpawnActor<APawn>(AIActors[i], SpawnTransform.Location, SpawnTransform.Rotation);
+				if (ActorToSpawn == nullptr) { return; }
+				ActorToSpawn->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+				ActorToSpawn->SpawnDefaultController();
+				ActorToSpawn->Tags.Add(FName("Enemy"));
+			}
+
 		}
 	}
 }
+
+//void ATile::PlaceGrass()
+//{
+//	FBox Bounds(MinExtent, MaxExtent);
+//
+//	for (int i = 0; i < Grass.Num(); i++)
+//	{
+//		int NumberToSpawn = FMath::RandRange(10, 20);
+//		for (int j = 0; j < NumberToSpawn; j++)
+//		{
+//			SpawnTransform.Location = FMath::RandPointInBox(Bounds);
+//			//auto GrassToSpawn = GetWorld()->SpawnActor(UHierarchicalInstancedStaticMeshComponent, SpawnTransform.Location);
+//			//GrassToSpawn->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+//		}
+//	}
+//}
 
 // Called every frame
 void ATile::Tick(float DeltaTime)
@@ -69,15 +121,16 @@ void ATile::Tick(float DeltaTime)
 
 }
 
+
 bool ATile::GenerateLocationAndRotation(FBox Bounds)
 {
 	for (int i = 0; i < 100; i++)
 	{
-		SpawnPoint = FMath::RandPointInBox(Bounds);
-		SpawnRotator.Yaw = FMath::RandRange(-180.f, 180.f);
-		SpawnRotator = FRotator(0, SpawnRotator.Yaw, 0);
+		SpawnTransform.Location = FMath::RandPointInBox(Bounds);
+		SpawnTransform.Rotation.Yaw = FMath::RandRange(-180.f, 180.f);
+		SpawnTransform.Rotation = FRotator(0, SpawnTransform.Rotation.Yaw, 0);
 
-		if (CanSpawnAtLocation(SpawnPoint, SpawnRotator))
+		if (CanSpawnAtLocation(SpawnTransform.Location, SpawnTransform.Rotation))
 		{
 			return true;
 		}
@@ -112,8 +165,7 @@ FVector ATile::GetActorDimensions(AActor* ActorToSpawn)
 	}
 	StaticMesh = Components[0]->GetStaticMesh();
 	auto Dimensions = StaticMesh->GetBoundingBox().GetSize();
-	//UE_LOG(LogTemp, Warning, TEXT("Dimensions: %s"), *Dimensions.ToString())
-
+	
 	return Dimensions;
 }
 

@@ -7,6 +7,18 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Tile.generated.h"
 
+USTRUCT()
+struct FSpawnTransform
+{
+	GENERATED_BODY()
+
+	FVector Location;
+	FRotator Rotation;
+	float Scale;
+};
+
+class UActorPool;
+
 UCLASS()
 class TESTINGGROUNDS_API ATile : public AActor
 {
@@ -19,8 +31,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Setup")
 	void PlaceActors();
 
-	UFUNCTION(BlueprintCallable, Category = "Setup")
-	void PlaceGrass();
+	void PlaceAIActors();
+
+	/*UFUNCTION(BlueprintCallable, Category = "Setup")
+	void PlaceGrass();*/
 
 	bool CanSpawnAtLocation(FVector, FRotator);
 
@@ -31,18 +45,38 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Setup")
+	FVector MinExtent;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Setup")
+	FVector MaxExtent;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Navigation")
+	FVector NavigationBoundsOffset;
+	
 
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Props")
-	TArray<TSubclassOf<AActor>> Props;
+	TArray<TSubclassOf<AActor>> Props;	
 
-	UPROPERTY(EditDefaultsOnly, Category = "Props")
-	TArray<TSubclassOf<UHierarchicalInstancedStaticMeshComponent>> Grass;
+	UPROPERTY(EditDefaultsOnly, Category = "AI Actors")
+	TArray<TSubclassOf<APawn>> AIActors;
+
+	/*UPROPERTY(EditDefaultsOnly, Category = "Props")
+	TArray<TSubclassOf<UHierarchicalInstancedStaticMeshComponent>> Grass;*/
+
+	UFUNCTION(BlueprintCallable, Category = "Nav Mesh Pool")
+	void SetPool(UActorPool* InPool);
+
+	void PositionNavMeshBoundsVolume();	
 	
 private:
-	FVector SpawnPoint;
-	FRotator SpawnRotator;
+	UActorPool* Pool;
+	AActor* NavMeshBoundsVolume;
+	FSpawnTransform SpawnTransform;
 };
